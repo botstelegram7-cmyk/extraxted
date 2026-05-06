@@ -21,13 +21,14 @@
 #  SOFTWARE
 
 import os
-from config import Config
-from pyrogram import Client, idle
+import sys
 import asyncio
 import logging
-import tgcrypto
-from pyromod import listen
 from logging.handlers import RotatingFileHandler
+
+from config import Config
+from pyrogram import Client, idle
+from pyromod import listen
 
 LOGGER = logging.getLogger(__name__)
 logging.basicConfig(
@@ -35,41 +36,61 @@ logging.basicConfig(
     format="%(name)s - %(message)s",
     datefmt="%d-%b-%y %H:%M:%S",
     handlers=[
-        RotatingFileHandler(
-            "log.txt", maxBytes=5000000, backupCount=10
-        ),
+        RotatingFileHandler("log.txt", maxBytes=5000000, backupCount=10),
         logging.StreamHandler(),
     ],
 )
 
-# ---------- FIXED AUTH_USERS ----------
-# Config.AUTH_USERS can be a list (new config) or a string (old config)
+# ---------- DEBUG: Print masked token to verify it's loaded ----------
+token = Config.BOT_TOKEN
+if token:
+    masked = token[:6] + "..." + token[-4:] if len(token) > 10 else "***"
+    LOGGER.info(f"Loaded BOT_TOKEN: {masked}")
+else:
+    LOGGER.error("BOT_TOKEN is empty! Set it in Render environment variables.")
+    sys.exit(1)
+
+# ---------- Auth Users ----------
 if isinstance(Config.AUTH_USERS, list):
     AUTH_USERS = Config.AUTH_USERS
 else:
     # If it's a comma-separated string (old style)
-    AUTH_USERS = [int(chat) for chat in Config.AUTH_USERS.split(",") if chat.strip()]
+    AUTH_USERS = [int(uid.strip()) for uid in Config.AUTH_USERS.split(",") if uid.strip()]
 
-# Prefixes 
+LOGGER.info(f"Authorized users: {AUTH_USERS}")
+
+# Prefixes
 prefixes = ["/", "~", "?", "!"]
 
 plugins = dict(root="plugins")
+
 if __name__ == "__main__":
     bot = Client(
         "StarkBot",
-        bot_token=Config.BOT_TOKEN,            # use from config, not os.environ
-        api_id=Config.API_ID,                  # use from config
-        api_hash=Config.API_HASH,              # use from config
+        bot_token=Config.BOT_TOKEN,
+        api_id=Config.API_ID,
+        api_hash=Config.API_HASH,
         sleep_threshold=20,
         plugins=plugins,
         workers=50
     )
     
     async def main():
-        await bot.start()
-        bot_info = await bot.get_me()
-        LOGGER.info(f"<--- @{bot_info.username} Started (c) STARKBOT --->")
-        await idle()
-    
-    asyncio.get_event_loop().run_until_complete(main())
-    LOGGER.info("<---Bot Stopped-->")
+        try:
+            await bot.start()
+            bot_info = await bot.get_me()
+            LOGGER.info(f"<--- @{bot_info.username} Started (c) STARKBOT --->")
+            await idle()
+        except Exception as e:
+            LOGGER.error(f"Failed to start bot: {e}")
+            raise
+
+    try:
+        asyncio.get_event_loop().run_until_complete(main())
+    except KeyboardInterrupt:
+        LOGGER.info("Bot stopped by user")
+    except Exception as e:
+        LOGGER.error(f"Fatal error: {e}")
+        sys.exit(1)
+    finally:
+        LOGGER.info("<--- Bot Stopped --->")
