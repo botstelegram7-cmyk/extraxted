@@ -20,11 +20,11 @@
 #  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 #  SOFTWARE
 
-
 import os
 from config import Config
 from pyrogram import Client, idle
-import asyncio, logging
+import asyncio
+import logging
 import tgcrypto
 from pyromod import listen
 from logging.handlers import RotatingFileHandler
@@ -42,29 +42,34 @@ logging.basicConfig(
     ],
 )
 
-# Auth Users
-AUTH_USERS = [ int(chat) for chat in Config.AUTH_USERS.split(",") if chat != '']
+# ---------- FIXED AUTH_USERS ----------
+# Config.AUTH_USERS can be a list (new config) or a string (old config)
+if isinstance(Config.AUTH_USERS, list):
+    AUTH_USERS = Config.AUTH_USERS
+else:
+    # If it's a comma-separated string (old style)
+    AUTH_USERS = [int(chat) for chat in Config.AUTH_USERS.split(",") if chat.strip()]
 
 # Prefixes 
 prefixes = ["/", "~", "?", "!"]
 
 plugins = dict(root="plugins")
-if __name__ == "__main__" :
+if __name__ == "__main__":
     bot = Client(
         "StarkBot",
-        bot_token=os.environ.get("BOT_TOKEN"),
-        api_id=int(os.environ.get("API_ID")),
-        api_hash=os.environ.get("API_HASH"),
+        bot_token=Config.BOT_TOKEN,            # use from config, not os.environ
+        api_id=Config.API_ID,                  # use from config
+        api_hash=Config.API_HASH,              # use from config
         sleep_threshold=20,
         plugins=plugins,
-        workers = 50
+        workers=50
     )
     
     async def main():
         await bot.start()
-        bot_info  = await bot.get_me()
+        bot_info = await bot.get_me()
         LOGGER.info(f"<--- @{bot_info.username} Started (c) STARKBOT --->")
         await idle()
     
     asyncio.get_event_loop().run_until_complete(main())
-    LOGGER.info(f"<---Bot Stopped-->")
+    LOGGER.info("<---Bot Stopped-->")
